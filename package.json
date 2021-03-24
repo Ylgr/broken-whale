@@ -57,6 +57,7 @@
     "@loopback/service-proxy": "^3.0.7",
     "axios": "^0.21.1",
     "dotenv": "^8.2.0",
+    "loopback-connector-mysql": "^5.4.4",
     "tslib": "^2.0.0"
   },
   "devDependencies": {
