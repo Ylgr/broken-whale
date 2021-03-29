@@ -25,7 +25,7 @@ export class Account extends Entity {
     type: 'string',
     required: true,
   })
-  secert_key: string;
+  secret_key: string;
 
   @property({
     type: 'boolean',
