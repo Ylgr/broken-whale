@@ -18,7 +18,13 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
       onTick: async () => {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         const accounts = await accountRepository.find({where: {is_active: true}})
-
+        Promise.all(accounts.map( (account: Account) =>
+          this.exchangeAccountExec(account)
+        )).then(() =>
+          console.log('Execute successes!')
+        ).catch(error =>
+          console.error('Cron fail: ' + error.message)
+        )
       },
       cronTime: '0 */5 * * * *',
       start: true,
