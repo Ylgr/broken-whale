@@ -1,7 +1,7 @@
 import {Entity, model, property, hasMany} from '@loopback/repository';
 import {OrderHistory} from './order-history.model';
 
-@model({settings: {strict: false}})
+@model({settings: {strict: true}})
 export class Account extends Entity {
   @property({
     type: 'number',

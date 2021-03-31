@@ -4,7 +4,9 @@ import {AccountRepository, OrderHistoryRepository} from '../repositories';
 import {Account} from '../models';
 import ccxt from 'ccxt';
 import {decrypt, telegramNotify} from '../utils/functions';
-
+import TDSequential from 'tdsequential';
+import axios from 'axios';
+import {listToken} from '../utils/constants'
 @cronJob()
 export class CronKeepAliveUserDataStreamComponent extends CronJob {
   constructor(
@@ -88,6 +90,18 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
   }
 
   async getBestStrategy() {
+    const kLineData = await this.getKLineData()
+
+    kLineData.forEach(kLineRes =>{
+      const tdResult = TDSequential(kLineRes.data.map((e: object[]) => {
+        return {
+          open: e[1],
+          high: e[2],
+          low: e[3],
+          close: e[4],
+        }
+      }))
+    })
 
     return {
       symbol: '',
@@ -96,4 +110,18 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
     };
   }
 
+  async getKLineData() {
+    const binanceAjax = axios.create({
+      baseURL: 'https://api.binance.com/',
+      responseType: 'json',
+      withCredentials: false,
+    })
+
+    return Promise.all(
+      listToken.map((symbol: string) => {
+        return binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`)
+      })
+    )
+
+  }
 }
