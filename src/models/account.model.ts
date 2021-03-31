@@ -28,6 +28,12 @@ export class Account extends Entity {
   secret_key: string;
 
   @property({
+    type: 'number',
+    required: true,
+  })
+  order_value: number;
+
+  @property({
     type: 'boolean',
     default: true,
   })

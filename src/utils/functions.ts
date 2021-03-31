@@ -8,7 +8,7 @@ const telegramAjax = axios.create({
   withCredentials: false,
 })
 
-export async function telegramNotify(channelId: string, text: string) {
+export async function telegramNotify(text: string, channelId = '576920941') {
   const telegramToken = process.env.TELEGRAM_TOKEN ?? '1367437609:AAFLfuZZ-DZxlqLPgTzSfP8Mby5ntXh3EYQ';
   return telegramAjax.get('bot' + telegramToken + '/sendMessage?chat_id=' + channelId + '&text=' + encodeURIComponent(text));
 }
