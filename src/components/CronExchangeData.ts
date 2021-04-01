@@ -4,11 +4,13 @@ import {AccountRepository, OrderHistoryRepository} from '../repositories';
 import {Account} from '../models';
 import ccxt from 'ccxt';
 import {decrypt, telegramNotify} from '../utils/functions';
-import TDSequential from 'tdsequential';
 import axios from 'axios';
-import {listToken} from '../utils/constants'
+import {listToken, triggerTd} from '../utils/constants'
+// @ts-ignore
+import TDSequential from 'tdsequential';
+
 @cronJob()
-export class CronKeepAliveUserDataStreamComponent extends CronJob {
+export class CronExchangeData extends CronJob {
   constructor(
     @repository(AccountRepository)
     public accountRepository: AccountRepository,
@@ -28,13 +30,13 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
           console.error('Cron fail: ' + error.message),
         );
       },
-      cronTime: '0 */5 * * * *',
+      cronTime: '*/5 * * * * *',
       start: true,
     });
   }
 
   async exchangeAccountExec(account: Account) {
-
+    console.log('decrypt(account.secret_key): ', decrypt(account.secret_key))
     const binance = new ccxt.binance({
       apiKey: account.api_key,
       secret: decrypt(account.secret_key),
@@ -93,6 +95,7 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
     const kLineData = await this.getKLineData()
 
     kLineData.forEach(kLineRes =>{
+      // @ts-ignore
       const tdResult = TDSequential(kLineRes.data.map((e: object[]) => {
         return {
           open: e[1],
@@ -101,6 +104,11 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
           close: e[4],
         }
       }))
+
+      const currentTd = tdResult[tdResult.length - 1]
+      if(currentTd.buySetupIndex === triggerTd) {
+        console.log()
+      }
     })
 
     return {
@@ -119,7 +127,10 @@ export class CronKeepAliveUserDataStreamComponent extends CronJob {
 
     return Promise.all(
       listToken.map((symbol: string) => {
-        return binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`)
+        return {
+          symbol: symbol,
+          data: binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`).then(e => e.data)
+        }
       })
     )
 

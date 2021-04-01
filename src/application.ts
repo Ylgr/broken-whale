@@ -1,5 +1,5 @@
 import {BootMixin} from '@loopback/boot';
-import {ApplicationConfig} from '@loopback/core';
+import {ApplicationConfig, createBindingFromClass} from '@loopback/core';
 import {
   RestExplorerBindings,
   RestExplorerComponent,
@@ -9,6 +9,9 @@ import {RestApplication} from '@loopback/rest';
 import {ServiceMixin} from '@loopback/service-proxy';
 import path from 'path';
 import {MySequence} from './sequence';
+import {CronComponent} from '@loopback/cron';
+import {CronExchangeData} from './components';
+
 
 export {ApplicationConfig};
 
@@ -29,6 +32,9 @@ export class BrokenWhaleApplication extends BootMixin(
       path: '/explorer',
     });
     this.component(RestExplorerComponent);
+
+    this.component(CronComponent)
+    this.add(createBindingFromClass(CronExchangeData))
 
     this.projectRoot = __dirname;
     // Customize @loopback/boot Booter Conventions here

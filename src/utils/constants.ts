@@ -8,3 +8,5 @@ export const listToken = [
   'DOTUSDT',
   'BCHUSDT',
 ]
+
+export const triggerTd = 1
