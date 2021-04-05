@@ -40,3 +40,17 @@ export function decrypt(text:string) {
 
   return decrypted.toString();
 }
+
+export function createUniqueId(id: number | undefined) {
+  return 'broken_whale_' + id
+}
+
+export function floorNumberByDecimals(number: number, decimal: number) {
+  const roundScale = Math.pow(10, decimal)
+  return Math.floor(number * roundScale) / roundScale
+}
+
+export function roundNumberByDecimals(number: number, decimal: number) {
+  const roundScale = Math.pow(10, decimal)
+  return Math.round(number * roundScale) / roundScale
+}

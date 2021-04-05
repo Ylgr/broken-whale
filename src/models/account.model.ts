@@ -34,6 +34,12 @@ export class Account extends Entity {
   order_value: number;
 
   @property({
+    type: 'number',
+    required: true,
+  })
+  order_tp: number;
+
+  @property({
     type: 'boolean',
     default: true,
   })
