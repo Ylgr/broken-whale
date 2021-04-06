@@ -50,6 +50,7 @@ export class CronExchangeData extends CronJob {
         const onlineOrder = await binance.privateGetOrders({origClientOrderId: createUniqueId(order.id)});
         if(onlineOrder.status === 'FILLED') {
           order.close_price = onlineOrder.price;
+          order.close_amount = onlineOrder.origQty;
           order.updated_at = new Date(onlineOrder.time).toString();
           order.is_active = false;
           await telegramNotify('Filled order: ', JSON.stringify(order))
@@ -61,6 +62,15 @@ export class CronExchangeData extends CronJob {
           await telegramNotify('Canceled order: ', JSON.stringify(order))
         }
         await this.orderHistoryRepository.update(order)
+
+        const kline = await this.getKLine(order.symbol)
+        const tdResult = this.getTDSequential(kline)
+        const currentTd = tdResult[tdResult.length - 1]
+        if(currentTd.sellSetupIndex === 9) {
+          const currentPrice = await this.getCurrentPrice(order.symbol)
+          // @ts-ignore
+          await telegramNotify(`9 TD detect: ${order.symbol}: Open - ${order.open_price}, Current - ${currentPrice.data.price}, Change ${(order.open_price * currentPrice.data.price)/order.open_price}`)
+        }
       } else {
 
         const bestStrategy = await this.getBestStrategy();
@@ -68,7 +78,7 @@ export class CronExchangeData extends CronJob {
           // notify strategy
           // create new order with balance free
 
-          const freeBalance = parseFloat((await binance.privateGetAccount()).balances.find((e: {asset: string;}) => e.asset === 'USDT').free) || 0;
+          const freeBalance = parseFloat((await binance.privateGetAccount()).balances.find((e: {asset: string;}) => e.asset === 'BUSD').free) || 0;
 
           if (freeBalance && account.order_value) {
 
@@ -77,16 +87,15 @@ export class CronExchangeData extends CronJob {
             const newOrder = await this.orderHistoryRepository.create({
               account_id: account.id,
               symbol: bestStrategy.symbol,
-              open_amount: bestStrategy.price,
+              open_amount: orderAmount,
+              open_price: bestStrategy.price,
             })
             try {
               const entryResult = await binance.privatePostOrder({
                 symbol: bestStrategy.symbol,
-                price: bestStrategy.price,
                 quantity: orderAmount,
                 type: 'MARKET',
-                side: 'BUY',
-                clientOrderId: createUniqueId(newOrder.id)
+                side: 'BUY'
               });
 
               await telegramNotify('Entry success: ', JSON.stringify(entryResult))
@@ -125,14 +134,7 @@ export class CronExchangeData extends CronJob {
 
     for (const kLineRes of kLineData) {
       // @ts-ignore
-      const tdResult = TDSequential(kLineRes.data.map((e: object[]) => {
-        return {
-          open: e[1],
-          high: e[2],
-          low: e[3],
-          close: e[4],
-        }
-      }))
+      const tdResult = this.getTDSequential(kLineRes)
 
       const currentTd = tdResult[tdResult.length - 1]
       const beforeCurrentTd = tdResult[tdResult.length - 1 - triggerTd]
@@ -140,7 +142,7 @@ export class CronExchangeData extends CronJob {
         const currentPrice = await this.getCurrentPrice(kLineRes.symbol)
         buyList.push({
           symbol: kLineRes.symbol,
-          price: parseFloat(currentPrice.data.price)*(1 - 2/1000),
+          price: parseFloat(currentPrice.data.price),
           reason: ''
         })
       }
@@ -150,6 +152,22 @@ export class CronExchangeData extends CronJob {
     } else {
       return buyList[Math.floor(Math.random() * buyList.length)];
     }
+    // return {
+    //   symbol: 'LTCBUSD',
+    //   price: 220,
+    //   reason: ''
+    // }
+  }
+
+  getTDSequential (kLineRes: any) : any[] {
+    return TDSequential(kLineRes.data.map((e: object[]) => {
+      return {
+        open: e[1],
+        high: e[2],
+        low: e[3],
+        close: e[4],
+      }
+    }))
   }
 
   binanceAjax = axios.create({
@@ -163,10 +181,14 @@ export class CronExchangeData extends CronJob {
       listToken.map(async (symbol: string) => {
         return {
           symbol: symbol,
-          data: await this.binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`).then(e => e.data)
+          data: await this.getKLine(symbol)
         }
       })
     )
+  }
+
+  async getKLine(symbol: string) {
+    return this.binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`).then(e => e.data)
   }
 
   async getCurrentPrice(symbol: string) {

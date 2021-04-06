@@ -1,12 +1,14 @@
 export const listToken = [
-  'BTCUSDT',
-  'ETHUSDT',
-  'LTCUSDT',
-  'BNBUSDT',
-  'LINKUSDT',
-  'ADAUSDT',
-  'DOTUSDT',
-  'BCHUSDT',
+  'BTCBUSD',
+  'ETHBUSD',
+  'LTCBUSD',
+  'BNBBUSD',
+  'LINKBUSD',
+  'ADABUSD',
+  'DOTBUSD',
+  'BCHBUSD',
+  'LINKBUSD',
+  'XLMBUSD',
 ]
 
 export const triggerTd = 1
