@@ -30,7 +30,7 @@ export class CronExchangeData extends CronJob {
           console.error('Cron fail: ' + error.message),
         );
       },
-      cronTime: '*/5 * * * * *',
+      cronTime: '* */5 * * * *',
       start: true,
     });
   }
@@ -53,15 +53,16 @@ export class CronExchangeData extends CronJob {
           order.close_amount = onlineOrder.origQty;
           order.updated_at = new Date(onlineOrder.time).toString();
           order.is_active = false;
-          await telegramNotify('Filled order: ', JSON.stringify(order))
+          await telegramNotify('Filled order: ' + JSON.stringify(order))
+          await this.orderHistoryRepository.update(order)
 
-        } if(onlineOrder.status === 'CANCELED') {
+        } else  if(onlineOrder.status === 'CANCELED') {
 
           order.updated_at = new Date(onlineOrder.time).toString();
           order.is_active = false;
-          await telegramNotify('Canceled order: ', JSON.stringify(order))
+          await telegramNotify('Canceled order: ' + JSON.stringify(order))
+          await this.orderHistoryRepository.update(order)
         }
-        await this.orderHistoryRepository.update(order)
 
         const kline = await this.getKLine(order.symbol)
         const tdResult = this.getTDSequential(kline)
@@ -81,8 +82,8 @@ export class CronExchangeData extends CronJob {
           const freeBalance = parseFloat((await binance.privateGetAccount()).balances.find((e: {asset: string;}) => e.asset === 'BUSD').free) || 0;
 
           if (freeBalance && account.order_value) {
-
-            const orderAmount = floorNumberByDecimals(account.order_value < freeBalance ? account.order_value / bestStrategy.price : freeBalance/ bestStrategy.price, 8)
+            const balanceSelected = account.order_value < freeBalance ? account.order_value : freeBalance
+            const orderAmount = floorNumberByDecimals( balanceSelected / bestStrategy.price, 8)
 
             const newOrder = await this.orderHistoryRepository.create({
               account_id: account.id,
@@ -93,12 +94,12 @@ export class CronExchangeData extends CronJob {
             try {
               const entryResult = await binance.privatePostOrder({
                 symbol: bestStrategy.symbol,
-                quantity: orderAmount,
+                quoteOrderQty: floorNumberByDecimals(balanceSelected,8),
                 type: 'MARKET',
                 side: 'BUY'
               });
 
-              await telegramNotify('Entry success: ', JSON.stringify(entryResult))
+              await telegramNotify('Entry success: ' + JSON.stringify(entryResult))
 
               const tpOrder = await binance.privatePostOrder({
                 symbol: bestStrategy.symbol,
@@ -109,21 +110,21 @@ export class CronExchangeData extends CronJob {
                 clientOrderId: createUniqueId(newOrder.id)
               });
 
-              await telegramNotify('Create tp: ', JSON.stringify(tpOrder))
+              await telegramNotify('Create tp: ' + JSON.stringify(tpOrder))
             } catch (e) {
               newOrder.is_active = false
               await this.orderHistoryRepository.update(newOrder)
-              await telegramNotify('create order fail: ', e.message)
+              await telegramNotify('create order fail: ' + e.message)
             }
 
 
           } else {
-            await telegramNotify('Zero USDT: ', freeBalance.toString())
+            await telegramNotify('Zero USDT: ' + freeBalance.toString())
           }
         }
       }
     } catch (e) {
-      await telegramNotify('Exchange execute fail! Reason: ', e.message)
+      await telegramNotify('Exchange execute fail! Reason: ' + e.message)
     }
 
   }
@@ -152,11 +153,6 @@ export class CronExchangeData extends CronJob {
     } else {
       return buyList[Math.floor(Math.random() * buyList.length)];
     }
-    // return {
-    //   symbol: 'LTCBUSD',
-    //   price: 220,
-    //   reason: ''
-    // }
   }
 
   getTDSequential (kLineRes: any) : any[] {
