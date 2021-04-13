@@ -42,7 +42,7 @@ export function decrypt(text:string) {
 }
 
 export function createUniqueId(id: number | undefined) {
-  return 'broken_whale_test_' + id
+  return 'broken_whale_' + id
 }
 
 export function floorNumberByDecimals(number: number, decimal: number) {
