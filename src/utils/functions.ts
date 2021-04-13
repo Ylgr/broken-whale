@@ -54,3 +54,22 @@ export function roundNumberByDecimals(number: number, decimal: number) {
   const roundScale = Math.pow(10, decimal)
   return Math.round(number * roundScale) / roundScale
 }
+
+function decimalPlaces(num: number) {
+  const match = (''+num).match(/(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/);
+  if (!match) { return 0; }
+  return Math.max(
+    0,
+    // Number of digits right of decimal point.
+    (match[1] ? match[1].length : 0)
+    // Adjust for scientific notation.
+    - (match[2] ? +match[2] : 0));
+}
+
+export function floorNumberByRef(number: number, refDecimalNumber: string | undefined) {
+  if (typeof refDecimalNumber === 'string') {
+    const decimal = decimalPlaces(parseFloat(refDecimalNumber));
+    const roundScale = Math.pow(10, decimal)
+    return Math.floor(number* roundScale)/roundScale
+  } else return 0
+}

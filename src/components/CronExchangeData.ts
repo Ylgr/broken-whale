@@ -3,9 +3,10 @@ import {repository} from '@loopback/repository';
 import {AccountRepository, OrderHistoryRepository} from '../repositories';
 import {Account} from '../models';
 import ccxt from 'ccxt';
-import {decrypt, telegramNotify, createUniqueId, floorNumberByDecimals} from '../utils/functions';
+import {decrypt, telegramNotify, createUniqueId, floorNumberByDecimals, floorNumberByRef} from '../utils/functions';
 import axios from 'axios';
 import {listToken, triggerTd} from '../utils/constants'
+import SpotMarketData from '../utils/spot-market-data.json'
 // @ts-ignore
 import TDSequential from 'tdsequential';
 
@@ -24,13 +25,11 @@ export class CronExchangeData extends CronJob {
         const accounts = await accountRepository.find({where: {is_active: true}});
         Promise.all(accounts.map((account: Account) =>
           this.exchangeAccountExec(account),
-        )).then(() =>
-          console.log('Execute successes!'),
-        ).catch(error =>
+        )).catch(error =>
           console.error('Cron fail: ' + error.message),
         );
       },
-      cronTime: '* */5 * * * *',
+      cronTime: '55 */5 * * * *',
       start: true,
     });
   }
@@ -46,8 +45,7 @@ export class CronExchangeData extends CronJob {
 
 
       if (order) {
-
-        const onlineOrder = await binance.privateGetOrders({origClientOrderId: createUniqueId(order.id)});
+        const onlineOrder = await binance.privateGetOrder({origClientOrderId: createUniqueId(order.id), symbol: order.symbol});
         if(onlineOrder.status === 'FILLED') {
           order.close_price = onlineOrder.price;
           order.close_amount = onlineOrder.origQty;
@@ -82,6 +80,11 @@ export class CronExchangeData extends CronJob {
           const freeBalance = parseFloat((await binance.privateGetAccount()).balances.find((e: {asset: string;}) => e.asset === 'BUSD').free) || 0;
 
           if (freeBalance && account.order_value) {
+            const symbolInfo = SpotMarketData.symbols.find(e => e.symbol === bestStrategy.symbol)
+
+            const priceFilter = symbolInfo?.filters.find(e => e.filterType === 'PRICE_FILTER')
+            const lotSize = symbolInfo?.filters.find(e => e.filterType === 'LOT_SIZE')
+
             const balanceSelected = account.order_value < freeBalance ? account.order_value : freeBalance
             const orderAmount = floorNumberByDecimals( balanceSelected / bestStrategy.price, 8)
 
@@ -103,11 +106,12 @@ export class CronExchangeData extends CronJob {
 
               const tpOrder = await binance.privatePostOrder({
                 symbol: bestStrategy.symbol,
-                price: floorNumberByDecimals(bestStrategy.price * (1 + account.order_tp/100), 8),
-                quantity: orderAmount,
+                price: floorNumberByRef(bestStrategy.price * (1 + account.order_tp/100), priceFilter?.tickSize),
+                quantity: floorNumberByRef(orderAmount, lotSize?.stepSize),
                 type: 'LIMIT',
                 side: 'SELL',
-                clientOrderId: createUniqueId(newOrder.id)
+                timeInForce: 'GTC',
+                newClientOrderId: createUniqueId(newOrder.id)
               });
 
               await telegramNotify('Create tp: ' + JSON.stringify(tpOrder))
@@ -119,14 +123,13 @@ export class CronExchangeData extends CronJob {
 
 
           } else {
-            await telegramNotify('Zero USDT: ' + freeBalance.toString())
+            await telegramNotify('Zero BUSD: ' + freeBalance.toString())
           }
         }
       }
     } catch (e) {
-      await telegramNotify('Exchange execute fail! Reason: ' + e.message)
+      await telegramNotify('Exchange execute fail! Reason: ' + e.stack)
     }
-
   }
 
   async getBestStrategy() {
@@ -150,13 +153,19 @@ export class CronExchangeData extends CronJob {
     }
     if(buyList.length === 0) {
       return null
+      // return {
+      //   symbol: 'EOSBUSD',
+      //   price: 6.52,
+      //   reason: ''
+      // }
     } else {
       return buyList[Math.floor(Math.random() * buyList.length)];
     }
   }
 
   getTDSequential (kLineRes: any) : any[] {
-    return TDSequential(kLineRes.data.map((e: object[]) => {
+    const data = kLineRes.data ? kLineRes.data : kLineRes
+    return TDSequential(data.map((e: object[]) => {
       return {
         open: e[1],
         high: e[2],
@@ -175,16 +184,23 @@ export class CronExchangeData extends CronJob {
   async getKLineData() {
     return Promise.all(
       listToken.map(async (symbol: string) => {
+        const klineData = await this.getKLine(symbol)
         return {
           symbol: symbol,
-          data: await this.getKLine(symbol)
+          data: klineData
         }
       })
     )
   }
 
   async getKLine(symbol: string) {
-    return this.binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`).then(e => e.data)
+    try {
+      const price = await this.binanceAjax.get(`api/v3/klines?symbol=${symbol}&interval=15m&limit=1000`).then(e => e.data)
+      return price
+    } catch (e) {
+      await telegramNotify(`Get kline fail ${symbol}. Reason: ${e.message}`)
+    }
+
   }
 
   async getCurrentPrice(symbol: string) {

@@ -23,22 +23,26 @@ export class OrderHistory extends Entity {
 
   @property({
     type: 'number',
+    dataType: 'float',
     required: true,
   })
   open_amount: number;
 
   @property({
     type: 'number',
+    dataType: 'float',
   })
   close_amount?: number;
 
   @property({
     type: 'number',
+    dataType: 'float',
   })
   open_price?: number;
 
   @property({
     type: 'number',
+    dataType: 'float',
   })
   close_price?: number;
 
