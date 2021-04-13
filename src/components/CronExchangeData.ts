@@ -49,14 +49,14 @@ export class CronExchangeData extends CronJob {
         if(onlineOrder.status === 'FILLED') {
           order.close_price = onlineOrder.price;
           order.close_amount = onlineOrder.origQty;
-          order.updated_at = new Date(onlineOrder.time).toString();
+          order.updated_at = new Date(Number(onlineOrder.time)).toString();
           order.is_active = false;
           await telegramNotify('Filled order: ' + JSON.stringify(order))
           await this.orderHistoryRepository.update(order)
 
         } else  if(onlineOrder.status === 'CANCELED') {
 
-          order.updated_at = new Date(onlineOrder.time).toString();
+          order.updated_at = new Date(Number(onlineOrder.time)).toString();
           order.is_active = false;
           await telegramNotify('Canceled order: ' + JSON.stringify(order))
           await this.orderHistoryRepository.update(order)
